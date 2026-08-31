@@ -29,6 +29,11 @@ if sys.platform == "win32":
     except Exception:
         pass
 
+# Ensure local ./ffmpeg/bin is added to PATH if present
+_LOCAL_FFMPEG_BIN = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ffmpeg", "bin")
+if os.path.isdir(_LOCAL_FFMPEG_BIN) and _LOCAL_FFMPEG_BIN not in os.environ.get("PATH", ""):
+    os.environ["PATH"] = _LOCAL_FFMPEG_BIN + os.pathsep + os.environ.get("PATH", "")
+
 try:
     import yt_dlp
 except ImportError:

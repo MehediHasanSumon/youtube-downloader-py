@@ -8,7 +8,7 @@ echo ===================================================
 echo.
 
 :: 1. Condition: Check if Python is installed and available in PATH
-echo [1/4] Checking Python installation...
+echo [1/5] Checking Python installation...
 where python >nul 2>nul
 if %errorlevel% neq 0 (
     echo [ERROR] Python is not installed or not added to PATH.
@@ -22,7 +22,7 @@ python --version
 
 :: 2. Condition: Check if Virtual Environment (venv) exists, create if missing
 echo.
-echo [2/4] Checking virtual environment...
+echo [2/5] Checking virtual environment...
 if not exist "venv\Scripts\activate.bat" (
     echo [INFO] Virtual environment not found. Creating 'venv'...
     python -m venv venv
@@ -38,7 +38,7 @@ if not exist "venv\Scripts\activate.bat" (
 
 :: 3. Condition: Activate Virtual Environment
 echo.
-echo [3/4] Activating virtual environment...
+echo [3/5] Activating virtual environment...
 if exist "venv\Scripts\activate.bat" (
     call venv\Scripts\activate.bat
     if !errorlevel! neq 0 (
@@ -55,7 +55,7 @@ if exist "venv\Scripts\activate.bat" (
 
 :: 4. Condition: Check if yt-dlp is installed, install dependencies if needed
 echo.
-echo [4/4] Checking dependencies...
+echo [4/5] Checking dependencies...
 python -c "import yt_dlp" >nul 2>nul
 if %errorlevel% neq 0 (
     echo [INFO] Required packages not found. Installing...
@@ -74,15 +74,36 @@ if %errorlevel% neq 0 (
     echo [OK] All required packages are already installed.
 )
 
-:: Optional Check: Check if FFmpeg is available on system
-where ffmpeg >nul 2>nul
-if %errorlevel% neq 0 (
-    echo.
-    echo [NOTE] FFmpeg was not detected in PATH.
-    echo High-resolution stream merging works best when FFmpeg is installed.
+:: 5. Condition: Check and Setup FFmpeg (Automatic download & PATH setup if missing)
+echo.
+echo [5/5] Checking FFmpeg installation...
+
+:: If local ffmpeg/bin exists, add to current session PATH immediately
+if exist "%~dp0ffmpeg\bin\ffmpeg.exe" (
+    set "PATH=%~dp0ffmpeg\bin;!PATH!"
 )
 
-:: 5. Condition: Check and run main.py
+where ffmpeg >nul 2>nul
+if %errorlevel% neq 0 (
+    echo [INFO] FFmpeg not found on system PATH.
+    echo [INFO] Starting automatic FFmpeg download and configuration...
+    if exist "setup_ffmpeg.py" (
+        python setup_ffmpeg.py
+        if !errorlevel! equ 0 (
+            set "PATH=%~dp0ffmpeg\bin;!PATH!"
+            echo [OK] FFmpeg downloaded and added to PATH successfully.
+        ) else (
+            echo [WARNING] Automatic FFmpeg setup could not complete.
+            echo High-resolution stream merging may be limited without FFmpeg.
+        )
+    ) else (
+        echo [WARNING] setup_ffmpeg.py not found. Skipping FFmpeg automatic installation.
+    )
+) else (
+    echo [OK] FFmpeg is available and ready.
+)
+
+:: 6. Condition: Check and run main.py
 echo.
 echo ===================================================
 echo                Starting Downloader
@@ -98,4 +119,5 @@ if exist "main.py" (
 echo.
 echo ===================================================
 echo Program execution finished.
+echo ===================================================
 pause
