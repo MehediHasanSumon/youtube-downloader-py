@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
 ====================================================================
- Automatic FFmpeg Downloader & PATH Configurator for Windows
+ Automatic FFmpeg Downloader & PATH Configurator
+ - Supports Linux (Ubuntu / Debian / etc.) and Windows (x86_64 & ARM64)
  - Checks system & local PATH for ffmpeg
- - Downloads FFmpeg essentials build with a visual progress bar
- - Extracts ffmpeg.exe, ffprobe.exe, ffplay.exe to ./ffmpeg/bin
- - Safely registers ./ffmpeg/bin in Windows User PATH (via Registry)
+ - Downloads official static FFmpeg builds with progress tracking
+ - Extracts binaries to ./ffmpeg/bin
+ - Configures PATH (Registry for Windows, environment for Linux)
 ====================================================================
 """
 
@@ -14,9 +15,10 @@ import sys
 import shutil
 import urllib.request
 import zipfile
+import tarfile
 import time
 import subprocess
-import ctypes
+import platform
 
 # Enable UTF-8 encoding and ANSI Virtual Terminal Processing on Windows
 if sys.platform == "win32":
@@ -26,6 +28,7 @@ if sys.platform == "win32":
     except AttributeError:
         pass
     try:
+        import ctypes
         kernel32 = ctypes.windll.kernel32
         h_stdout = kernel32.GetStdHandle(-11)  # STD_OUTPUT_HANDLE
         mode = ctypes.c_ulong()
@@ -42,11 +45,32 @@ RED = "\033[91m"
 BOLD = "\033[1m"
 RESET = "\033[0m"
 
-FFMPEG_URLS = [
-    "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip",
-    "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip",
-    "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip",
-]
+
+def get_ffmpeg_urls() -> tuple[list[str], str]:
+    """Returns the mirror URLs and archive extension appropriate for the current platform."""
+    is_windows = sys.platform == "win32"
+    arch = platform.machine().lower()
+
+    if is_windows:
+        urls = [
+            "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip",
+            "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip",
+            "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip",
+        ]
+        return urls, ".zip"
+    else:
+        # Linux / Unix
+        if "arm" in arch or "aarch64" in arch:
+            urls = [
+                "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linuxarm64-gpl.tar.xz",
+                "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-arm64-static.tar.xz",
+            ]
+        else:
+            urls = [
+                "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz",
+                "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz",
+            ]
+        return urls, ".tar.xz"
 
 
 def format_bytes(bytes_num: float) -> str:
@@ -66,7 +90,7 @@ def download_with_progress(url: str, output_path: str) -> bool:
     req = urllib.request.Request(url, headers=headers)
 
     try:
-        with urllib.request.urlopen(req, timeout=30) as response, open(output_path, "wb") as out_file:
+        with urllib.request.urlopen(req, timeout=40) as response, open(output_path, "wb") as out_file:
             total_size = int(response.headers.get("Content-Length", 0))
             downloaded = 0
             start_time = time.time()
@@ -120,103 +144,132 @@ def download_with_progress(url: str, output_path: str) -> bool:
         return False
 
 
-def extract_ffmpeg(zip_path: str, destination_dir: str) -> bool:
-    """Extracts ffmpeg.exe, ffprobe.exe, and ffplay.exe to target directory."""
-    print(f"{CYAN}[Extracting]{RESET} Unpacking FFmpeg binaries...")
+def extract_ffmpeg(archive_path: str, destination_dir: str) -> bool:
+    """Extracts ffmpeg, ffprobe, and ffplay binaries to destination_dir/bin."""
+    print(f"{CYAN}[Extracting]{RESET} Unpacking FFmpeg archive...")
     bin_dir = os.path.join(destination_dir, "bin")
     os.makedirs(bin_dir, exist_ok=True)
 
+    target_binaries = (
+        {"ffmpeg.exe", "ffprobe.exe", "ffplay.exe"}
+        if sys.platform == "win32"
+        else {"ffmpeg", "ffprobe", "ffplay"}
+    )
+
     extracted_count = 0
-    try:
-        with zipfile.ZipFile(zip_path, "r") as zip_ref:
-            for member in zip_ref.namelist():
-                # Extract executables inside any 'bin/' folder in archive
-                filename = os.path.basename(member)
-                if filename.lower() in ("ffmpeg.exe", "ffprobe.exe", "ffplay.exe"):
-                    target_file = os.path.join(bin_dir, filename)
-                    with zip_ref.open(member) as source, open(target_file, "wb") as target:
-                        shutil.copyfileobj(source, target)
-                    extracted_count += 1
-                    print(f"  {GREEN}✔{RESET} Extracted {filename} -> {target_file}")
 
-        if extracted_count > 0:
-            print(f"{GREEN}[OK]{RESET} Successfully extracted {extracted_count} FFmpeg binaries.")
-            return True
-        else:
-            print(f"{RED}[ERROR]{RESET} No FFmpeg executables found in the archive.")
+    # 1. Check if zip archive
+    if zipfile.is_zipfile(archive_path):
+        try:
+            with zipfile.ZipFile(archive_path, "r") as zip_ref:
+                for member in zip_ref.namelist():
+                    filename = os.path.basename(member)
+                    if filename.lower() in {b.lower() for b in target_binaries}:
+                        target_file = os.path.join(bin_dir, filename)
+                        with zip_ref.open(member) as source, open(target_file, "wb") as target:
+                            shutil.copyfileobj(source, target)
+                        if sys.platform != "win32":
+                            os.chmod(target_file, 0o755)
+                        extracted_count += 1
+                        print(f"  {GREEN}✔{RESET} Extracted {filename} -> {target_file}")
+        except Exception as e:
+            print(f"{RED}[ERROR]{RESET} Failed to extract zip archive: {e}")
             return False
-    except Exception as e:
-        print(f"{RED}[ERROR]{RESET} Failed to extract zip archive: {e}")
+
+    # 2. Check if tar / tar.xz / tar.gz archive
+    else:
+        try:
+            with tarfile.open(archive_path, "r:*") as tar_ref:
+                for member in tar_ref.getmembers():
+                    filename = os.path.basename(member.name)
+                    if filename in target_binaries:
+                        target_file = os.path.join(bin_dir, filename)
+                        f = tar_ref.extractfile(member)
+                        if f is not None:
+                            with open(target_file, "wb") as target:
+                                shutil.copyfileobj(f, target)
+                            if sys.platform != "win32":
+                                os.chmod(target_file, 0o755)
+                            extracted_count += 1
+                            print(f"  {GREEN}✔{RESET} Extracted {filename} -> {target_file}")
+        except Exception as e:
+            print(f"{RED}[ERROR]{RESET} Failed to extract tar archive: {e}")
+            return False
+
+    if extracted_count > 0:
+        print(f"{GREEN}[OK]{RESET} Successfully extracted {extracted_count} FFmpeg binaries.")
+        return True
+    else:
+        print(f"{RED}[ERROR]{RESET} No FFmpeg executables found in archive.")
         return False
 
 
-def add_to_windows_user_path(directory_to_add: str) -> bool:
-    """
-    Safely adds a folder to the Windows User Environment PATH in Registry.
-    Uses winreg to avoid the 1024-character truncation issue of 'setx'.
-    """
-    if sys.platform != "win32":
-        return False
-
+def configure_path(directory_to_add: str) -> bool:
+    """Configures system/user environment to permanently or persistently recognize FFmpeg."""
     directory_to_add = os.path.abspath(directory_to_add)
 
-    try:
-        import winreg
-
-        reg_key = winreg.OpenKey(
-            winreg.HKEY_CURRENT_USER,
-            r"Environment",
-            0,
-            winreg.KEY_READ | winreg.KEY_WRITE,
-        )
-
+    # Windows Registry configuration
+    if sys.platform == "win32":
         try:
-            current_path, _ = winreg.QueryValueEx(reg_key, "Path")
-        except FileNotFoundError:
-            current_path = ""
+            import winreg
+            import ctypes
 
-        # Normalize and split existing entries
-        existing_paths = [p.strip() for p in current_path.split(";") if p.strip()]
-
-        # Check if already present
-        if any(os.path.normpath(p).lower() == os.path.normpath(directory_to_add).lower() for p in existing_paths):
-            winreg.CloseKey(reg_key)
-            return True
-
-        # Append directory
-        existing_paths.append(directory_to_add)
-        new_path_val = ";".join(existing_paths)
-
-        winreg.SetValueEx(reg_key, "Path", 0, winreg.REG_EXPAND_SZ, new_path_val)
-        winreg.CloseKey(reg_key)
-
-        # Notify running applications of environment change
-        try:
-            HWND_BROADCAST = 0xFFFF
-            WM_SETTINGCHANGE = 0x001A
-            SMTO_ABORTIFHUNG = 0x0002
-            result = ctypes.c_long()
-            ctypes.windll.user32.SendMessageTimeoutW(
-                HWND_BROADCAST,
-                WM_SETTINGCHANGE,
+            reg_key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Environment",
                 0,
-                "Environment",
-                SMTO_ABORTIFHUNG,
-                3000,
-                ctypes.byref(result),
+                winreg.KEY_READ | winreg.KEY_WRITE,
             )
-        except Exception:
-            pass
 
-        print(f"{GREEN}[OK]{RESET} Added {directory_to_add} to permanent Windows User PATH.")
+            try:
+                current_path, _ = winreg.QueryValueEx(reg_key, "Path")
+            except FileNotFoundError:
+                current_path = ""
+
+            existing_paths = [p.strip() for p in current_path.split(";") if p.strip()]
+
+            if any(os.path.normpath(p).lower() == os.path.normpath(directory_to_add).lower() for p in existing_paths):
+                winreg.CloseKey(reg_key)
+                return True
+
+            existing_paths.append(directory_to_add)
+            new_path_val = ";".join(existing_paths)
+
+            winreg.SetValueEx(reg_key, "Path", 0, winreg.REG_EXPAND_SZ, new_path_val)
+            winreg.CloseKey(reg_key)
+
+            try:
+                HWND_BROADCAST = 0xFFFF
+                WM_SETTINGCHANGE = 0x001A
+                SMTO_ABORTIFHUNG = 0x0002
+                result = ctypes.c_long()
+                ctypes.windll.user32.SendMessageTimeoutW(
+                    HWND_BROADCAST,
+                    WM_SETTINGCHANGE,
+                    0,
+                    "Environment",
+                    SMTO_ABORTIFHUNG,
+                    3000,
+                    ctypes.byref(result),
+                )
+            except Exception:
+                pass
+
+            print(f"{GREEN}[OK]{RESET} Added {directory_to_add} to permanent Windows User PATH.")
+            return True
+        except Exception as e:
+            print(f"{YELLOW}[WARNING]{RESET} Could not update Windows User PATH in registry: {e}")
+            return False
+
+    else:
+        # On Linux/Ubuntu: binaries in ./ffmpeg/bin are handled dynamically by run.sh and main.py
+        print(f"{GREEN}[OK]{RESET} FFmpeg available in local path: {directory_to_add}")
+        print(f"{CYAN}[Tip]{RESET} You can also install system-wide via: sudo apt install ffmpeg")
         return True
-    except Exception as e:
-        print(f"{YELLOW}[WARNING]{RESET} Could not permanently update User PATH in registry: {e}")
-        return False
 
 
 def is_ffmpeg_installed() -> bool:
-    """Check if ffmpeg executable is available in PATH or can be invoked."""
+    """Check if ffmpeg executable is available in system PATH or can be invoked."""
     ffmpeg_cmd = shutil.which("ffmpeg")
     if ffmpeg_cmd:
         return True
@@ -238,7 +291,9 @@ def setup_ffmpeg(force: bool = False) -> bool:
     project_root = os.path.dirname(os.path.abspath(__file__))
     local_ffmpeg_dir = os.path.join(project_root, "ffmpeg")
     local_bin_dir = os.path.join(local_ffmpeg_dir, "bin")
-    local_ffmpeg_exe = os.path.join(local_bin_dir, "ffmpeg.exe")
+
+    binary_name = "ffmpeg.exe" if sys.platform == "win32" else "ffmpeg"
+    local_ffmpeg_binary = os.path.join(local_bin_dir, binary_name)
 
     # Add local bin dir to current process PATH
     if os.path.exists(local_bin_dir) and local_bin_dir not in os.environ.get("PATH", ""):
@@ -246,26 +301,28 @@ def setup_ffmpeg(force: bool = False) -> bool:
 
     # Check if already installed
     if not force:
-        if os.path.isfile(local_ffmpeg_exe):
+        if os.path.isfile(local_ffmpeg_binary):
             print(f"{GREEN}[OK]{RESET} FFmpeg is already installed locally in: {local_bin_dir}")
-            add_to_windows_user_path(local_bin_dir)
+            configure_path(local_bin_dir)
             return True
 
         if is_ffmpeg_installed():
             print(f"{GREEN}[OK]{RESET} FFmpeg is already installed and available on system PATH.")
             return True
 
+    os_label = "Windows" if sys.platform == "win32" else f"Linux ({platform.machine()})"
     print(f"\n{BOLD}{YELLOW}==================================================={RESET}")
-    print(f"{BOLD}{YELLOW}          FFmpeg Automatic Setup for Windows       {RESET}")
+    print(f"{BOLD}{YELLOW}          FFmpeg Automatic Setup for {os_label}    {RESET}")
     print(f"{BOLD}{YELLOW}==================================================={RESET}\n")
-    print(f"{CYAN}[INFO]{RESET} FFmpeg is not found. Downloading pre-built binaries...")
+    print(f"{CYAN}[INFO]{RESET} FFmpeg not found. Downloading static standalone build...")
 
-    zip_temp = os.path.join(project_root, "ffmpeg_temp.zip")
+    urls, ext = get_ffmpeg_urls()
+    archive_temp = os.path.join(project_root, f"ffmpeg_temp{ext}")
     download_success = False
 
-    for idx, url in enumerate(FFMPEG_URLS, 1):
-        print(f"\n{CYAN}[Source {idx}/{len(FFMPEG_URLS)}]{RESET} Downloading from: {url}")
-        if download_with_progress(url, zip_temp):
+    for idx, url in enumerate(urls, 1):
+        print(f"\n{CYAN}[Source {idx}/{len(urls)}]{RESET} Downloading from: {url}")
+        if download_with_progress(url, archive_temp):
             download_success = True
             break
         else:
@@ -273,24 +330,27 @@ def setup_ffmpeg(force: bool = False) -> bool:
 
     if not download_success:
         print(f"\n{RED}[ERROR]{RESET} Failed to download FFmpeg from all available mirrors.")
-        print(f"Please install FFmpeg manually from: https://www.gyan.dev/ffmpeg/builds/")
+        if sys.platform != "win32":
+            print(f"{YELLOW}[Solution]{RESET} Run: sudo apt update && sudo apt install -y ffmpeg")
+        else:
+            print(f"Please install FFmpeg manually from: https://www.gyan.dev/ffmpeg/builds/")
         return False
 
     # Extract
-    extract_success = extract_ffmpeg(zip_temp, local_ffmpeg_dir)
+    extract_success = extract_ffmpeg(archive_temp, local_ffmpeg_dir)
 
-    # Clean up temporary zip
-    if os.path.exists(zip_temp):
+    # Clean up temporary archive
+    if os.path.exists(archive_temp):
         try:
-            os.remove(zip_temp)
+            os.remove(archive_temp)
         except OSError:
             pass
 
     if not extract_success:
         return False
 
-    # Configure permanent Windows User PATH
-    add_to_windows_user_path(local_bin_dir)
+    # Configure PATH
+    configure_path(local_bin_dir)
 
     # Ensure current process PATH includes local_bin_dir
     os.environ["PATH"] = local_bin_dir + os.pathsep + os.environ.get("PATH", "")
@@ -298,7 +358,7 @@ def setup_ffmpeg(force: bool = False) -> bool:
     # Verify
     try:
         res = subprocess.run(
-            [local_ffmpeg_exe, "-version"],
+            [local_ffmpeg_binary, "-version"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,

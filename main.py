@@ -38,16 +38,74 @@ try:
     import yt_dlp
 except ImportError:
     print("\n\033[91m[ERROR] 'yt-dlp' package is missing!\033[0m")
-    print("Please run 'run.bat' or install it using: pip install -U yt-dlp\n")
+    launcher = "run.bat" if sys.platform == "win32" else "./run.sh"
+    print(f"Please run '{launcher}' or install it using: pip install -U yt-dlp\n")
     sys.exit(1)
 
 
-# Check if msvcrt (Windows keyboard input) is available
-try:
-    import msvcrt
-    HAS_MSVCRT = True
-except ImportError:
-    HAS_MSVCRT = False
+def read_key() -> str:
+    """
+    Reads a single keypress or key event across Windows and Linux/Unix.
+    Returns: 'UP', 'DOWN', 'ENTER', 'CTRL_C', or character string (e.g. '1', '2').
+    """
+    if sys.platform == "win32":
+        try:
+            import msvcrt
+            key = msvcrt.getch()
+            if key in (b'\x00', b'\xe0'):
+                sub_key = msvcrt.getch()
+                if sub_key == b'H':
+                    return "UP"
+                elif sub_key == b'P':
+                    return "DOWN"
+                return ""
+            elif key in (b'\r', b'\n'):
+                return "ENTER"
+            elif key == b'\x03':
+                return "CTRL_C"
+            else:
+                return key.decode("ascii", errors="ignore")
+        except Exception:
+            return ""
+    else:
+        try:
+            import tty
+            import termios
+            import select
+
+            fd = sys.stdin.fileno()
+            old_settings = termios.tcgetattr(fd)
+            try:
+                tty.setraw(fd)
+                ch = sys.stdin.read(1)
+                if ch == '\x1b':
+                    # Check if there is an escape sequence pending within 50ms
+                    rlist, _, _ = select.select([sys.stdin], [], [], 0.05)
+                    if rlist:
+                        ch2 = sys.stdin.read(1)
+                        if ch2 == '[':
+                            ch3 = sys.stdin.read(1)
+                            if ch3 == 'A':
+                                return "UP"
+                            elif ch3 == 'B':
+                                return "DOWN"
+                            elif ch3 == 'C':
+                                return "RIGHT"
+                            elif ch3 == 'D':
+                                return "LEFT"
+                            return ""
+                        return ""
+                    return "ESC"
+                elif ch in ('\r', '\n'):
+                    return "ENTER"
+                elif ch == '\x03':
+                    return "CTRL_C"
+                else:
+                    return ch
+            finally:
+                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        except Exception:
+            return ""
 
 
 def format_bytes(bytes_num):
@@ -80,12 +138,13 @@ def progress_hook(d):
 def interactive_menu(prompt: str, options: list[str], default_index: int = 0) -> int:
     """
     Renders an interactive CLI menu controlled via Keyboard Arrow Keys (Up/Down) & Enter.
+    Falls back to numeric choice if stdin is non-interactive.
     """
     selected = default_index
     num_options = len(options)
 
-    if not HAS_MSVCRT:
-        # Fallback for environments without msvcrt
+    if not sys.stdin.isatty():
+        # Fallback for non-interactive environments
         print(f"\n{prompt}")
         for idx, opt in enumerate(options, 1):
             print(f"  [{idx}] {opt}")
@@ -118,28 +177,22 @@ def interactive_menu(prompt: str, options: list[str], default_index: int = 0) ->
 
     try:
         while True:
-            key = msvcrt.getch()
+            key = read_key()
 
-            # Arrow keys or special keys on Windows
-            if key in (b'\x00', b'\xe0'):
-                sub_key = msvcrt.getch()
-                if sub_key == b'H':  # Up Arrow
-                    selected = (selected - 1) % num_options
-                    render()
-                elif sub_key == b'P':  # Down Arrow
-                    selected = (selected + 1) % num_options
-                    render()
-            # Enter key
-            elif key in (b'\r', b'\n'):
+            if key == "UP":
+                selected = (selected - 1) % num_options
+                render()
+            elif key == "DOWN":
+                selected = (selected + 1) % num_options
+                render()
+            elif key == "ENTER":
                 break
-            # Ctrl + C
-            elif key == b'\x03':
+            elif key == "CTRL_C":
                 sys.stdout.write("\033[?25h\n")
                 sys.stdout.flush()
                 raise KeyboardInterrupt
-            # Direct number key shortcuts (1-9)
             elif key.isdigit():
-                num = int(key.decode("ascii", errors="ignore"))
+                num = int(key)
                 if 1 <= num <= num_options:
                     selected = num - 1
                     render()
@@ -168,7 +221,7 @@ def get_download_options(save_path: str, format_choice: int, is_playlist: bool =
 
     ydl_opts = {
         "outtmpl": {"default": out_template},
-        "windowsfilenames": True,  # Safe Windows file names
+        "windowsfilenames": sys.platform == "win32",  # Safe Windows file names on Windows
         "ignoreerrors": True,      # Continue if one video in playlist has issues
         "retries": 10,
         "fragment_retries": 10,
