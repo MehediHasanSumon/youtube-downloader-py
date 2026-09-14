@@ -1035,6 +1035,104 @@ def view_recent_logs(lines: int = 25):
 
 
 # ====================================================================
+#  Interactive Post-Download Action Menu
+# ====================================================================
+
+POST_DOWNLOAD_ACTIONS = [
+    "Download another video / playlist",
+    "Open downloads folder in file manager",
+    "View recent logs (youtube_downloader.log)",
+    "Exit",
+]
+
+
+def generate_post_download_table(selected_index: int) -> Panel:
+    """Constructs the styled panel for the interactive post-download action menu."""
+    table = Table.grid(padding=(0, 2))
+    table.add_column("Key", width=6)
+    table.add_column("Option", style="white")
+
+    for idx, opt in enumerate(POST_DOWNLOAD_ACTIONS):
+        num = idx + 1
+        if idx == selected_index:
+            table.add_row(
+                f"[bold bright_cyan]> [{num}][/bold bright_cyan]",
+                f"[bold bright_white]{opt}[/bold bright_white]",
+            )
+        else:
+            table.add_row(f"  [dim][{num}][/dim]", f"[dim]{opt}[/dim]")
+
+    return Panel(
+        table,
+        title="[bold bright_cyan] What would you like to do next? [/bold bright_cyan]",
+        subtitle="[dim]Use Up/Down arrows or keys 1-4, Enter to confirm[/dim]",
+        border_style="cyan",
+        padding=(1, 2),
+    )
+
+
+def interactive_post_download_menu(default_index: int = 0) -> int:
+    """
+    Renders an interactive post-download action menu with Arrow Key Navigation (↑/↓)
+    and direct 1-4 keypresses, Enter to confirm.
+    Falls back gracefully to numeric input if not in a TTY.
+    """
+    num_options = len(POST_DOWNLOAD_ACTIONS)
+    selected = default_index
+
+    # Fallback for non-interactive TTY environments
+    if not sys.stdin.isatty():
+        console.print(generate_post_download_table(selected))
+        choice = Prompt.ask(
+            "  Choose action",
+            choices=[str(i + 1) for i in range(num_options)],
+            default=str(default_index + 1),
+        )
+        return int(choice) - 1
+
+    # Hide cursor
+    sys.stdout.write("\033[?25l")
+    sys.stdout.flush()
+
+    try:
+        with Live(generate_post_download_table(selected), console=console, auto_refresh=False) as live:
+            while True:
+                key = read_key()
+
+                if key in ("UP", "k", "K", "w", "W"):
+                    selected = (selected - 1) % num_options
+                    live.update(generate_post_download_table(selected), refresh=True)
+                elif key in ("DOWN", "j", "J", "s", "S"):
+                    selected = (selected + 1) % num_options
+                    live.update(generate_post_download_table(selected), refresh=True)
+                elif key.isdigit() and 1 <= int(key) <= num_options:
+                    selected = int(key) - 1
+                    live.update(generate_post_download_table(selected), refresh=True)
+                    break
+                elif key in ("ENTER", "SPACE"):
+                    break
+                elif key in ("ESC", "q", "Q"):
+                    selected = 3  # Exit
+                    break
+                elif key == "CTRL_C":
+                    raise KeyboardInterrupt
+    finally:
+        # Restore cursor
+        sys.stdout.write("\033[?25h")
+        sys.stdout.flush()
+        if sys.platform != "win32":
+            try:
+                import termios
+                termios.tcflush(sys.stdin.fileno(), termios.TCIFLUSH)
+            except Exception:
+                pass
+
+    chosen = POST_DOWNLOAD_ACTIONS[selected]
+    console.print(f"  [bold bright_green]✓ Action:[/bold bright_green] [bold white]{chosen}[/bold white]\n")
+    return selected
+
+
+# ====================================================================
 #  Main Application Flow
 # ====================================================================
 
@@ -1154,25 +1252,26 @@ def main():
             app_logger.error(f"Error during download execution: {e}", exc_info=True)
             console.print(f"\n\n  [bold red][ERROR][/bold red] An error occurred during download: [dim]{e}[/dim]\n")
 
-        # Step 9: Post-Download Action Menu
+        # Step 9: Post-Download Action Menu (Interactive Arrow Key Navigation)
         console.print(Rule(style="dim cyan"))
-        console.print("  [bold bright_white]What would you like to do next?[/bold bright_white]")
-        console.print("    [bold cyan][1][/bold cyan] Download another video / playlist")
-        console.print("    [bold cyan][2][/bold cyan] Open downloads folder in file manager")
-        console.print("    [bold cyan][3][/bold cyan] View recent logs (youtube_downloader.log)")
-        console.print("    [bold cyan][4][/bold cyan] Exit")
-        console.print()
+        action_idx = 0
 
         while True:
-            next_action = Prompt.ask("  Choose action", choices=["1", "2", "3", "4"], default="1")
-            if next_action == "2":
+            action_idx = interactive_post_download_menu(default_index=action_idx)
+            if action_idx == 0:
+                # Download another video / playlist
+                break
+            elif action_idx == 1:
+                # Open downloads folder in file manager
                 open_folder(full_dest_path)
-            elif next_action == "3":
+            elif action_idx == 2:
+                # View recent logs
                 view_recent_logs()
-            elif next_action in ("1", "4"):
+            elif action_idx == 3:
+                # Exit
                 break
 
-        if next_action == "4":
+        if action_idx == 3:
             app_logger.info("Application closed by user from menu.")
             console.print("\n  [dim]Thank you for using YouTube Downloader Pro![/dim]\n")
             break
