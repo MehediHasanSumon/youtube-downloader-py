@@ -53,7 +53,8 @@ sudo apt update && sudo apt install -y ffmpeg
 
 - **Interactive Arrow-Key Menu**: Use `↑` / `↓` arrow keys and `Enter` to select quality format directly in your terminal (or press number keys `1`–`5`).
 - **Maximum Quality**: Downloads best video + best audio and merges them losslessly into MP4 via FFmpeg (8K / 4K / 1440p / 1080p).
-- **Playlist Support**: Automatically detects playlist links and organizes all videos into a dedicated folder with numbered order (`01 - Title.mp4`).
+- **Smart Disk Check & Auto-Resume**: Checks your destination folder directly before downloading. Videos already present on disk are instantly skipped without redownloading. Incomplete downloads (.part) automatically resume seamlessly.
+- **Playlist Detection & Isolation**: Choose whether to download the entire playlist or just the single video when links contain both.
 - **Audio Extraction**: High-quality 320kbps MP3 and original quality M4A.
 - **Zero Configuration**: Fully automated setup script for both Ubuntu and Windows.
 
