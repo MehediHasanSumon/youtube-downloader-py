@@ -53,10 +53,10 @@ if exist "venv\Scripts\activate.bat" (
     exit /b 1
 )
 
-:: 4. Condition: Check if yt-dlp is installed, install dependencies if needed
+:: 4. Condition: Check if yt-dlp and rich are installed, install dependencies if needed
 echo.
 echo [4/5] Checking dependencies...
-python -c "import yt_dlp" >nul 2>nul
+python -c "import yt_dlp, rich" >nul 2>nul
 if %errorlevel% neq 0 (
     echo [INFO] Required packages not found. Installing...
     if exist "requirements.txt" (
@@ -108,7 +108,10 @@ echo.
 echo ===================================================
 echo                Starting Downloader
 echo ===================================================
-echo.
+
+:: Brief pause so user sees all checks passed, then clear screen for clean UI
+timeout /t 1 /nobreak >nul
+cls
 
 if exist "main.py" (
     python main.py

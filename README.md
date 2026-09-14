@@ -1,8 +1,10 @@
-# YouTube & Media Downloader (CLI)
+# YouTube & Media Downloader Pro (Next-Level Terminal TUI)
 
-A powerful, interactive command-line YouTube video and playlist downloader with automated dependency setup and lossless FFmpeg merging. Supports up to 8K, 4K, 1440p, 1080p60 video and 320kbps MP3 audio.
+A state-of-the-art, interactive command-line YouTube video and playlist downloader with automated dependency setup, real-time metadata preview, lossless FFmpeg merging, and an ultra-modern Terminal User Interface (TUI).
 
-Works seamlessly on **Linux (Ubuntu / Debian)** and **Windows**.
+Supports up to **8K, 4K, 1440p, 1080p60 MP4 video** and **320kbps MP3 audio**.
+
+Works seamlessly on **Linux (Ubuntu / Debian / Mint)** and **Windows**.
 
 ---
 
@@ -29,14 +31,9 @@ Works seamlessly on **Linux (Ubuntu / Debian)** and **Windows**.
 > The launcher (`./run.sh`) automatically:
 > - Verifies Python 3 is installed.
 > - Creates and activates a virtual environment (`venv`).
-> - Installs `yt-dlp` from `requirements.txt`.
-> - Checks for FFmpeg (and automatically downloads a standalone static Linux build if FFmpeg is missing from your system — **no root/sudo password required!**).
+> - Installs `yt-dlp` and `rich` from `requirements.txt`.
+> - Checks for FFmpeg (and automatically downloads a standalone static Linux build if missing — **no root/sudo password required!**).
 > - Launches `main.py`.
-
-If you prefer installing FFmpeg system-wide on Ubuntu, you can optionally run:
-```bash
-sudo apt update && sudo apt install -y ffmpeg
-```
 
 ---
 
@@ -49,25 +46,36 @@ sudo apt update && sudo apt install -y ffmpeg
 
 ---
 
-## 🎮 Features
+## 💎 Next-Level UI/UX Features
 
-- **Interactive Arrow-Key Menu**: Use `↑` / `↓` arrow keys and `Enter` to select quality format directly in your terminal (or press number keys `1`–`5`).
-- **Maximum Quality**: Downloads best video + best audio and merges them losslessly into MP4 via FFmpeg (8K / 4K / 1440p / 1080p).
-- **Smart Disk Check & Auto-Resume**: Checks your destination folder directly before downloading. Videos already present on disk are instantly skipped without redownloading. Incomplete downloads (.part) automatically resume seamlessly.
-- **Playlist Detection & Isolation**: Choose whether to download the entire playlist or just the single video when links contain both.
-- **Audio Extraction**: High-quality 320kbps MP3 and original quality M4A.
-- **Zero Configuration**: Fully automated setup script for both Ubuntu and Windows.
+- **Visual Hero Header & Status Badges**: Clean, branded dashboard displaying engine, FFmpeg, and OS status.
+- **Instant Media Information Card**: Fetches video metadata with a live spinner and displays title, channel/artist, duration, view count, and content type before downloading.
+- **Interactive Keyboard Navigation**: Smoothly navigate format options using keyboard arrow keys (`↑` / `↓`) and `Enter`, or press number keys (`1`–`5`) directly.
+- **Maximum Quality (8K / 4K / 1080p60)**: Downloads the best video stream and best audio stream, then losslessly merges them into MP4 via FFmpeg.
+- **Smart Disk Check & Auto-Resume**: Checks your destination folder directly before downloading. Files already on disk are skipped automatically. Incomplete downloads (`.part`) automatically resume from where they stopped.
+- **Live Real-Time Rich Progress Engine**: Real-time progress bar tracking stream download, percentage, MB downloaded / total, speed in MB/s, and ETA. Separate status indicators for video download, audio download, and FFmpeg stream merging.
+- **Playlist Dual-Tracking**: Shows overall playlist progress alongside the active video's download progress.
+- **Completed Items Dashboard**: Displays real-time `✓ Completed` notifications for each video along with a structured summary table showing download status and file size.
+- **Dedicated Log File (`youtube_downloader.log`)**: Automatically logs all downloads, skips, errors, and yt-dlp diagnostic messages. You can inspect logs directly from the interactive post-download menu.
+- **Clean Terminal Experience**: Automatically clears terminal setup checks before launching the interactive dashboard.
+- **Post-Download Action Dashboard**: Upon completion, view the download summary with an option to open the downloads folder directly in your system file manager (`xdg-open` on Linux, `File Explorer` on Windows).
 
 ---
 
 ## 🇧🇩 বাংলা নির্দেশিকা (Quick Guide in Bengali)
 
-### লিনাক্স উবুন্টুতে চালানো:
+### লিনাক্স উবুন্টু / ডেবিয়ানে চালানো:
 টার্মিনালে প্রজেক্ট ফোল্ডারে গিয়ে রান করুন:
 ```bash
 chmod +x run.sh
 ./run.sh
 ```
-`run.sh` স্বয়ংক্রিয়ভাবে Python এনভায়রনমেন্ট তৈরি করবে, `yt-dlp` ইন্সটল করবে এবং FFmpeg না থাকলে নিজে থেকেই ডাউনলোড করে কনফিগার করে নেবে (রুট/sudo পাসওয়ার্ড লাগবে না)।
+`run.sh` স্বয়ংক্রিয়ভাবে Python ভার্চুয়াল এনভায়রনমেন্ট তৈরি করবে, `yt-dlp` ও `rich` ইন্সটল করবে এবং FFmpeg না থাকলে স্বয়ংক্রিয়ভাবে ডাউনলোড ও কনফিগার করে নেবে (কোনো root/sudo পাসওয়ার্ড লাগবে না)। চেক শেষ হওয়ার পর টার্মিনাল স্বয়ংক্রিয়ভাবে ক্লিয়ার হয়ে ফ্রেশ ইন্টারফেস ওপেন হবে।
 
-মেনুতে কিবোর্ডের `↑` / `↓` অ্যারো কি দিয়ে কোয়ালিটি বেছে নিয়ে `Enter` চাপুন।
+### নতুন আকর্ষণীয় ফিচারসমূহ:
+1. **লাইভ মিডিয়া কার্ড**: লিঙ্ক পেস্ট করতেই স্বয়ংক্রিয়ভাবে ভিডিওর নাম, চ্যানেল, ভিউ ও সময়সীমা প্রিভিউ আকারে দেখাবে।
+2. **অ্যারো কি দিয়ে সিলেক্ট**: কীবোর্ডের `↑` / `↓` অ্যারো কি দিয়ে সহজেই কোয়ালিটি বেছে নেওয়া যাবে, কিংবা সরাসরি `1` থেকে `5` চাপলেও সিলেক্ট হয়ে যাবে।
+3. **রিয়েলটাইম প্রগ্রেস ও কমপ্লিট স্ট্যাটাস**: প্রতিটি ভিডিও ডাউনলোড শেষে `✓ Completed` স্ট্যাটাস, ফাইল সাইজ ও সামারি টেবিলে সম্পূর্ণ রিপোর্ট দেখাবে।
+4. **স্মার্ট অটো-রিজিউম ও স্কিপ**: আগে থেকে ডাউনলোড করা থাকলে স্বয়ংক্রিয়ভাবে স্কিপ করবে, আর অসম্পূর্ণ থাকলে সেখান থেকেই রিজুউম করবে।
+5. **লগ ফাইল (`youtube_downloader.log`)**: প্রতিটি ডাউনলোডের সময়, গতি, সম্পন্ন হওয়া ফাইল এবং ত্রুটি স্বয়ংক্রিয়ভাবে লগ ফাইলে সেভ হবে এবং মেনু থেকেও দেখা যাবে।
+6. **এক ক্লিকে ফোল্ডার ওপেন**: ডাউনলোড শেষে অপশন থেকে সরাসরি ফাইল ম্যানেজারে ফোল্ডার খুলে দেখার সুবিধা।

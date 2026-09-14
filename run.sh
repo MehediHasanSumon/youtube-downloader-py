@@ -60,10 +60,10 @@ if [ $? -ne 0 ]; then
 fi
 echo -e "${GREEN}[OK]${NC} Virtual environment activated."
 
-# 4. Condition: Check if yt-dlp is installed, install dependencies if needed
+# 4. Condition: Check if yt-dlp and rich are installed, install dependencies if needed
 echo ""
 echo -e "${BOLD}[4/5] Checking dependencies...${NC}"
-python3 -c "import yt_dlp" >/dev/null 2>&1
+python3 -c "import yt_dlp, rich" >/dev/null 2>&1
 if [ $? -ne 0 ]; then
     echo -e "${CYAN}[INFO]${NC} Required packages not found. Installing..."
     if [ -f "requirements.txt" ]; then
@@ -114,7 +114,10 @@ echo ""
 echo -e "${CYAN}===================================================${NC}"
 echo -e "${BOLD}               Starting Downloader                 ${NC}"
 echo -e "${CYAN}===================================================${NC}"
-echo ""
+
+# Brief pause so user sees all checks passed, then clear screen for clean UI
+sleep 1
+clear
 
 if [ -f "main.py" ]; then
     python3 main.py "$@"

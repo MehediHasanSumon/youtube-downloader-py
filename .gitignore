@@ -7,3 +7,4 @@ ffmpeg/
 *.tar.xz
 *.tar.gz
 *.tar
+*.log
